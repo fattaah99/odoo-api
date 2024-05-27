@@ -704,10 +704,8 @@ class OdooAPI(http.Controller):
             return True
 
     # This is for deleting one record
-    @http.route(
-        '/api/<string:model>/<int:rec_id>/',
-        type='http', auth="user", methods=['DELETE'], csrf=False)
-    def delete_model_record(self, model,  rec_id, **post):
+    @http.route('/api/<string:model>/<int:rec_id>/', type='http', auth='user', methods=['DELETE'], csrf=False)
+    def delete_model_record(self, model, rec_id, **post):
         auth_header = request.httprequest.headers.get('Authorization')
         if not auth_header:
             return http.Response(
@@ -730,32 +728,56 @@ class OdooAPI(http.Controller):
         try:
             model_to_del_rec = request.env[model]
         except KeyError as e:
-            msg = "The model `%s` does not exist." % model
-            res = error_response(e, msg)
+            msg = f"The model `{model}` does not exist."
+            res = {'status': 'error', 'message': msg}
             return http.Response(
                 json.dumps(res),
-                status=200,
+                status=400,
                 mimetype='application/json'
             )
 
-        # TODO: Handle error raised by `ensure_one`
-        rec = model_to_del_rec.browse(rec_id).ensure_one()
+        rec = model_to_del_rec.browse(rec_id)
+        if not rec.exists():
+            return http.Response(
+                json.dumps({'status': 'error', 'message': 'Record not found'}),
+                status=404,
+                mimetype='application/json'
+            )
 
         try:
-            is_deleted = rec.unlink()
-            res = {
-                "result": is_deleted
+            rec.ensure_one()  # Ensure that we are dealing with a single record
+            deleted_record_info = {
+                "model": model,
+                "record_id": rec.id,
+                "record_name": rec.name_get()[0][1] if rec.name else "Unnamed record"
             }
-            return http.Response(
-                json.dumps(res),
-                status=200,
-                mimetype='application/json'
-            )
+            is_deleted = rec.unlink()
+            if is_deleted:
+                res = {
+                    "status": "success",
+                    "message": "Record successfully deleted",
+                    "deleted_record": deleted_record_info
+                }
+                return http.Response(
+                    json.dumps(res),
+                    status=200,
+                    mimetype='application/json'
+                )
+            else:
+                res = {
+                    "status": "error",
+                    "message": "Failed to delete record"
+                }
+                return http.Response(
+                    json.dumps(res),
+                    status=400,
+                    mimetype='application/json'
+                )
         except Exception as e:
-            res = error_response(e, str(e))
+            res = {'status': 'error', 'message': str(e)}
             return http.Response(
                 json.dumps(res),
-                status=200,
+                status=400,
                 mimetype='application/json'
             )
 
