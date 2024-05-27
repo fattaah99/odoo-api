@@ -61,8 +61,6 @@ class OdooAPI(http.Controller):
     #     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
     #         raise http.AuthenticationError(str(e))
 
-    # SECRET_KEY = 'solusi247'  # Ganti dengan kunci rahasia Anda
-
     @http.route('/api/login', type='json', auth='public', methods=['POST'], csrf=False)
     def api_login(self, **kw):
         try:
