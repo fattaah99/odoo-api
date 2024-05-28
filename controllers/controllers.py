@@ -561,7 +561,16 @@ class OdooAPI(http.Controller):
 
         try:
             rec.write(data)
-            return {'result': True}
+
+            res = {
+
+                'status': 201,
+                'message': f'Record successfully updated in model {model}',
+                'record_id': rec.id,
+                'input_data': data  # Include the input data in the response
+
+            }
+            return res
         except Exception as e:
             return {'result': False, 'error': str(e)}
 
