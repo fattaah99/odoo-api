@@ -445,9 +445,7 @@ class OdooAPI(http.Controller):
             mimetype='application/json'
         )
 
-    @http.route(
-        '/api/<string:model>/',
-        type='json', auth="user", methods=['POST'], csrf=False)
+    @http.route('/api/<string:model>/', type='json', auth='user', methods=['POST'], csrf=False)
     def post_model_data(self, model, **post):
         auth_header = request.httprequest.headers.get('Authorization')
         if not auth_header:
@@ -461,7 +459,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -471,24 +469,59 @@ class OdooAPI(http.Controller):
         try:
             data = post['data']
         except KeyError:
-            msg = "`data` parameter is not found on POST request body"
-            raise exceptions.ValidationError(msg)
+            msg = "`data` parameter is not found in POST request body"
+            return http.Response(
+                json.dumps({'status': 'error', 'message': msg}),
+                status=400,
+                mimetype='application/json'
+            )
 
         try:
             model_to_post = request.env[model]
         except KeyError:
-            msg = "The model `%s` does not exist." % model
-            raise exceptions.ValidationError(msg)
+            msg = f"The model `{model}` does not exist."
+            return http.Response(
+                json.dumps({'status': 'error', 'message': msg}),
+                status=400,
+                mimetype='application/json'
+            )
 
-        # TODO: Handle data validation
+        try:
+            # Handle data validation if necessary
+            if "context" in post:
+                context = post["context"]
+                record = model_to_post.with_context(**context).create(data)
+            else:
+                record = model_to_post.create(data)
 
-        if "context" in post:
-            context = post["context"]
-            record = model_to_post.with_context(**context).create(data)
-        else:
-            record = model_to_post.create(data)
-        return record.id
+            res = {
 
+                'status': 201,
+                'message': f'Record successfully created in model {model}',
+                'record_id': record.id,
+                'input_data': data  # Include the input data in the response
+
+            }
+            # response = request.make_response(
+            #     json.dumps(res),
+            #     headers=[('Content-Type', 'application/json')],
+            #     status=201
+            # )
+            return res
+        except exceptions.ValidationError as e:
+            msg = str(e)
+            return http.Response(
+                json.dumps({'status': 'error', 'message': msg}),
+                status=400,
+                mimetype='application/json'
+            )
+        except Exception as e:
+            msg = str(e)
+            return http.Response(
+                json.dumps({'status': 'error', 'message': msg}),
+                status=500,
+                mimetype='application/json'
+            )
 
     @http.route(
         '/api/<string:model>/<int:rec_id>/', type='json', auth="user", methods=['PUT'], csrf=False)
@@ -879,54 +912,54 @@ class OdooAPI(http.Controller):
             src
         )
 
-class hallowApi (http.Controller):
-    @http.route('/api', auth='public', website=False, type='http', methods=['GET'], csrf=False)
-    def hello(self, **kw):
-        return "hello wordllll"
-
-    @http.route('/api/auth', type='json', auth='none', methods=['POST'], csrf=False)
-    def api_login(self, **kw):
-        params = request.jsonrequest
-        login = params.get('login')
-        password = params.get('password')
-
-        if not login or not password:
-            return {'status': 'error', 'message': 'Login and password required'}
-
-        uid = request.session.authenticate(request.db, login, password)
-        if uid:
-            user = request.env['res.users'].browse([uid])
-            return {
-                'status': 'success',
-                'user_id': user.id,
-                'session_id': request.session.sid,
-                'name': user.name,
-                'email': user.email,
-            }
-        else:
-            return {'status': 'error', 'message': 'Invalid credentials'}
-
-class HrEmployeeAPI(http.Controller):
-
-    @http.route('/api/hr/employees', type='http', auth='none', methods=['GET'], csrf=False)
-    def get_employees(self, **kwargs):
-        api_key = request.httprequest.headers.get('X-API-Key')
-        if not api_key or api_key != 'odoo1234':
-            return request.make_response(json.dumps({'error': 'Unauthorized'}),
-                                         headers=[('Content-Type', 'application/json')], status=401)
-
-        employees = request.env['hr.employee'].sudo().search([])
-
-        # Urutkan karyawan berdasarkan ID
-        sorted_employees = sorted(employees, key=lambda x: x.id)
-
-        employee_data = []
-        for employee in sorted_employees:
-            employee_data.append({
-                'id': employee.id,
-                'name': employee.name,
-                'department': employee.department_id.name,
-                'job_title': employee.job_id.name,
-                'work_email': employee.work_email,
-            })
-        return request.make_response(json.dumps(employee_data), headers=[('Content-Type', 'application/json')])
+# class hallowApi (http.Controller):
+#     @http.route('/api', auth='public', website=False, type='http', methods=['GET'], csrf=False)
+#     def hello(self, **kw):
+#         return "hello wordllll"
+#
+#     @http.route('/api/auth', type='json', auth='none', methods=['POST'], csrf=False)
+#     def api_login(self, **kw):
+#         params = request.jsonrequest
+#         login = params.get('login')
+#         password = params.get('password')
+#
+#         if not login or not password:
+#             return {'status': 'error', 'message': 'Login and password required'}
+#
+#         uid = request.session.authenticate(request.db, login, password)
+#         if uid:
+#             user = request.env['res.users'].browse([uid])
+#             return {
+#                 'status': 'success',
+#                 'user_id': user.id,
+#                 'session_id': request.session.sid,
+#                 'name': user.name,
+#                 'email': user.email,
+#             }
+#         else:
+#             return {'status': 'error', 'message': 'Invalid credentials'}
+#
+# class HrEmployeeAPI(http.Controller):
+#
+#     @http.route('/api/hr/employees', type='http', auth='none', methods=['GET'], csrf=False)
+#     def get_employees(self, **kwargs):
+#         api_key = request.httprequest.headers.get('X-API-Key')
+#         if not api_key or api_key != 'odoo1234':
+#             return request.make_response(json.dumps({'error': 'Unauthorized'}),
+#                                          headers=[('Content-Type', 'application/json')], status=401)
+#
+#         employees = request.env['hr.employee'].sudo().search([])
+#
+#         # Urutkan karyawan berdasarkan ID
+#         sorted_employees = sorted(employees, key=lambda x: x.id)
+#
+#         employee_data = []
+#         for employee in sorted_employees:
+#             employee_data.append({
+#                 'id': employee.id,
+#                 'name': employee.name,
+#                 'department': employee.department_id.name,
+#                 'job_title': employee.job_id.name,
+#                 'work_email': employee.work_email,
+#             })
+#         return request.make_response(json.dumps(employee_data), headers=[('Content-Type', 'application/json')])

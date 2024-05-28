@@ -3,6 +3,7 @@ import os
 import logging
 from odoo import http
 from odoo.http import request
+from odoo import http, exceptions
 
 _logger = logging.getLogger(__name__)
 
@@ -21,4 +22,4 @@ class authValidation:
             return user
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
             _logger.warning(f'JWT verification failed: {str(e)}')
-            raise http.AuthenticationError(str(e))
+            raise exceptions.AccessDenied(str(e))
