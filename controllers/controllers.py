@@ -301,7 +301,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -402,7 +402,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -538,7 +538,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -583,7 +583,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -664,7 +664,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -749,7 +749,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -829,7 +829,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
@@ -885,7 +885,7 @@ class OdooAPI(http.Controller):
 
         try:
             authValidation.verify_jwt_token(token)
-        except http.AuthenticationError as e:
+        except exceptions.AccessDenied as e:
             return http.Response(
                 json.dumps({'status': 'error', 'message': str(e)}),
                 status=401,
