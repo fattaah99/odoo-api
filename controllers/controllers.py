@@ -6,15 +6,19 @@ import jwt
 from datetime import datetime, timedelta
 from odoo import http, fields
 from .auth_validation import authValidation, SECRET_KEY
+from .cors_middleware import cors_dispatch, set_cors_headers
 import requests
 from odoo import http
 from odoo.http import request
 from odoo import http, _, exceptions
-from odoo.http import request
+from odoo.http import request,  Response, Controller
+# from werkzeug.wrappers import Response
 
 from .serializers import Serializer
 from .exceptions import QueryFormatError
+from httplib2 import Response
 from odoo.exceptions import ValidationError
+
 
 
 
@@ -40,6 +44,12 @@ def error_response(error, msg):
     }
 
 #
+def set_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000/'  # Change '*' to your specific domain in production
+    response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
 class OdooAPI(http.Controller):
 
     def _check_access(self, required_groups):
@@ -61,7 +71,9 @@ class OdooAPI(http.Controller):
     #     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
     #         raise http.AuthenticationError(str(e))
 
-    @http.route('/api/login', type='json', auth='public', methods=['POST'], csrf=False)
+
+    # login lain dengan cros
+    @http.route('/api/login', type='http', auth='none', cors='http://localhost:8060', methods=['POST'], csrf=False)
     def api_login(self, **kw):
         try:
             # Retrieve raw data and parse JSON manually
@@ -69,15 +81,15 @@ class OdooAPI(http.Controller):
             login = params.get('login')
             password = params.get('password')
 
-            if not login :
-                return {'status': 'error', 'message': 'Login and password required'}
+            if not login or not password:
+                return self._cors_response({'status': 'error', 'message': 'Login and password required'}, 400)
 
             uid = request.session.authenticate(request.db, login, password)
             if uid:
                 user = request.env['res.users'].browse([uid])
 
                 # Generate JWT token
-                expiration = datetime.utcnow() + timedelta(hours=1)
+                expiration = datetime.utcnow() + timedelta(minutes=1)
                 token = jwt.encode({
                     'user_id': user.id,
                     'exp': expiration
@@ -89,7 +101,7 @@ class OdooAPI(http.Controller):
                     'jwt_token_expiration': fields.Datetime.to_string(expiration)
                 })
 
-                return {
+                response_data = {
                     'status': 'success',
                     'user_id': user.id,
                     'session_id': request.session.sid,
@@ -97,10 +109,37 @@ class OdooAPI(http.Controller):
                     'email': user.email,
                     'token': token
                 }
+                return self._cors_response(response_data)
             else:
-                return {'status': 'error', 'message': 'Invalid credentials'}
+                return self._cors_response({'status': 'error', 'message': 'Invalid credentials'}, 401)
         except Exception as e:
-            return {'status': 'error', 'message': str(e)}
+            return self._cors_response({'status': 'error', 'message': str(e)}, 500)
+
+    def _cors_response(self, response_data, status=200):
+        response_json = json.dumps(response_data)
+        response = request.make_response(response_json)
+        response.status_code = status
+        response.mimetype = 'application/json'
+        # response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
+
+    def site_cors_response(self, response):
+        try:
+            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000/'
+            response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        except Exception as e:
+            _logger.error("Error setting CORS headers: %s", e)
+        return response
+
+    @http.route('/api/login', type='http', auth='public', methods=['OPTIONS'], csrf=False)
+    def api_login_options(self, **kw):
+        response = request.make_response()
+        response.status_code = 200
+        return self.site_cors_response(response)
+
 
     # @http.route('/api/login', type='json', auth='public', methods=['POST'], csrf=False)
     # def api_login(self, **kw):
@@ -176,6 +215,62 @@ class OdooAPI(http.Controller):
 #             # Retrieve and return session info
 #             res = request.env['ir.http'].session_info()
 #             return res
+
+    # @http.route('/api/login', type='json', auth='public', methods=['POST'], csrf=False)
+    # def api_login(self, **kw):
+    #     try:
+    #         # Retrieve raw data and parse JSON manually
+    #         params = json.loads(request.httprequest.data.decode())
+    #         login = params.get('login')
+    #         password = params.get('password')
+    #
+    #         # Validate input parameters
+    #         if not login or not password:
+    #             return {'status': 'error', 'message': 'Login and password required'}
+    #
+    #         # Authenticate user
+    #         uid = request.session.authenticate(request.db, login, password)
+    #         if uid:
+    #             user = request.env['res.users'].browse([uid])
+    #
+    #             # Generate JWT token
+    #             expiration = datetime.utcnow() + timedelta(hours=1)
+    #             token = jwt.encode({
+    #                 'user_id': user.id,
+    #                 'exp': expiration,
+    #                 'iat': datetime.utcnow(),
+    #                 'nbf': datetime.utcnow()
+    #             }, SECRET_KEY, algorithm='HS256')
+    #
+    #             # Save the token and expiration in the user
+    #             user.write({
+    #                 'jwt_token': token,
+    #                 'jwt_token_expiration': fields.Datetime.to_string(expiration)
+    #             })
+    #
+    #             return {
+    #                 'status': 'success',
+    #                 'user_id': user.id,
+    #                 'session_id': request.session.sid,
+    #                 'name': user.name,
+    #                 'email': user.email,
+    #                 'token': token
+    #             }
+    #         else:
+    #             return {'status': 'error', 'message': 'Invalid credentials'}
+    #
+    #     except Exception as e:
+    #         # Log the exception for debugging purposes
+    #         request.env['ir.logging'].sudo().create({
+    #             'name': 'API Login Error',
+    #             'type': 'server',
+    #             'level': 'error',
+    #             'message': str(e),
+    #             'path': '/api/login',
+    #             'line': '1',
+    #             'func': 'api_login'
+    #         })
+    #         return {'status': 'error', 'message': 'An error occurred'}
 
     @http.route(
         '/object/<string:model>/<string:function>',
